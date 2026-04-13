@@ -1,7 +1,7 @@
 // ── service-worker.js ─────────────────────────────────────────────────────────
 // Caches all app assets on install; serves from cache first when offline.
 
-const CACHE_NAME = 'hindi-trainer-v5';
+const CACHE_NAME = 'hindi-trainer-v6';
 
 const PRECACHE_URLS = [
     './',

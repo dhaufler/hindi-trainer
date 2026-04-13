@@ -221,6 +221,19 @@
             transform: translateY(0);
         }
 
+        .word-gloss {
+            margin-top: 6px;
+            font-size: 0.78rem;
+            color: var(--muted);
+            letter-spacing: 0.01em;
+            line-height: 1.5;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+        .word-gloss.visible {
+            opacity: 1;
+        }
+
         /* ── Response / feedback area ───────────────────────────────────────── */
         .response-area {
             background: var(--surface);
@@ -545,6 +558,7 @@
 
             <!-- Correct Hindi answer (revealed after attempt) -->
             <div class="hindi-answer" id="hindi-answer" aria-live="polite"></div>
+            <div class="word-gloss" id="word-gloss"></div>
         </div>
 
         <!-- Response & feedback area -->

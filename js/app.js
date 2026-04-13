@@ -90,6 +90,9 @@ function advanceToNext() {
     $topicBadge.textContent = currentPhrase.topic;
     $hindiAnswer.textContent = '';
     $hindiAnswer.classList.remove('visible');
+    const $gloss = document.getElementById('word-gloss');
+    $gloss.textContent = '';
+    $gloss.classList.remove('visible');
     $userResponse.textContent = '';
     $feedback.textContent = '';
     $feedback.className = 'feedback';
@@ -226,6 +229,7 @@ function showFeedback(score, result) {
     // Reveal the correct answer
     $hindiAnswer.textContent = currentPhrase._resolvedHindi;
     $hindiAnswer.classList.add('visible');
+    showGloss();
 
     const pct = Math.round(score * 100);
 
@@ -368,6 +372,14 @@ function showTextInput() {
     if (input) input.focus();
 }
 
+function showGloss() {
+    const $gloss = document.getElementById('word-gloss');
+    if (!$gloss || !currentPhrase) return;
+    const gloss = currentPhrase.gloss || '';
+    $gloss.textContent = gloss;
+    $gloss.classList.add('visible');
+}
+
 function showAllCaughtUp() {
     $englishPrompt.textContent = '🎉 All caught up!';
     $topicBadge.textContent = '';
@@ -425,6 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
         peeked = true;
         $hindiAnswer.textContent = currentPhrase._resolvedHindi;
         $hindiAnswer.classList.add('visible');
+        showGloss();
         $showAnswerBtn.classList.add('hidden');
         $nextBtn.classList.remove('hidden');
         $resultButtons.classList.remove('hidden');
