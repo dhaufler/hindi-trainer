@@ -17,7 +17,7 @@ const SEED_PHRASES = [
     { id: 11, english: "What is your name?", hindi: "aapka naam kya hai", topic: "identity", template: false },
     {
         id: 12, english: "My name is ___", hindi: "mera naam ___ hai", topic: "identity", template: true,
-        variants: ["ravi", "sara", "amir"]
+        variants: ["darrell"]
     },
     { id: 13, english: "Where are you from?", hindi: "aap kahan se hain", topic: "identity", template: false },
     { id: 14, english: "I am from America", hindi: "main america se hoon", topic: "identity", template: false },
