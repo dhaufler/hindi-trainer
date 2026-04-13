@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!-- Background -->
+  <rect width="192" height="192" rx="40" fill="#1a1a28"/>
+
+  <!-- Speech-bubble shape -->
+  <path d="M32 44 Q32 28 48 28 H144 Q160 28 160 44 V116 Q160 132 144 132 H108 L88 160 L76 132 H48 Q32 132 32 116 Z"
+        fill="#7c7cf8" opacity="0.18"/>
+  <path d="M32 44 Q32 28 48 28 H144 Q160 28 160 44 V116 Q160 132 144 132 H108 L88 160 L76 132 H48 Q32 132 32 116 Z"
+        fill="none" stroke="#7c7cf8" stroke-width="4"/>
+
+  <!-- "Hi" text in transliteration style -->
+  <text x="96" y="100" text-anchor="middle"
+        font-family="system-ui, sans-serif"
+        font-size="46" font-weight="700"
+        fill="#e2e2f0" letter-spacing="-1">hi</text>
+
+  <!-- Subtle mic dot -->
+  <circle cx="96" cy="170" r="6" fill="#7c7cf8" opacity="0.6"/>
+</svg>

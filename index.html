@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f0f18" />
+    <meta name="description" content="Spoken Hindi trainer — transliteration spaced-repetition" />
+    <title>Hindi Trainer</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.svg" />
+
+    <style>
+        /* ── Reset & tokens ─────────────────────────────────────────────────── */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0f0f18;
+            --surface: #1a1a28;
+            --surface2: #22223a;
+            --border: #2e2e50;
+            --primary: #7c7cf8;
+            --primary-d: #5757e0;
+            --text: #e2e2f0;
+            --muted: #6b6b9a;
+            --correct: #22c55e;
+            --close: #eab308;
+            --incorrect: #ef4444;
+            --radius: 16px;
+            --gap: 12px;
+        }
+
+        html,
+        body {
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            font-size: 16px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100dvh;
+            /* dynamic viewport height on mobile */
+            padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+        }
+
+        /* ── Status message ─────────────────────────────────────────────────── */
+        .status-msg {
+            display: none;
+            text-align: center;
+            font-size: 0.85rem;
+            padding: 8px 16px;
+            background: var(--surface2);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .status-msg.error {
+            color: var(--incorrect);
+        }
+
+        .status-msg.info {
+            color: var(--muted);
+        }
+
+        /* ── Stats bar ──────────────────────────────────────────────────────── */
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px var(--gap);
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        /* ── Progress bar ───────────────────────────────────────────────────── */
+        .progress-wrap {
+            padding: 8px var(--gap) 4px;
+            flex-shrink: 0;
+        }
+
+        .progress-track {
+            background: var(--surface2);
+            border-radius: 99px;
+            height: 6px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-d), var(--primary));
+            border-radius: 99px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .progress-label {
+            font-size: 0.7rem;
+            color: var(--muted);
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        /* ── Main scroll region ─────────────────────────────────────────────── */
+        .main {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--gap);
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap);
+        }
+
+        /* ── Phrase card ────────────────────────────────────────────────────── */
+        .phrase-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            position: relative;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .topic-badge {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--primary);
+            background: color-mix(in srgb, var(--primary) 15%, transparent);
+            padding: 3px 8px;
+            border-radius: 99px;
+        }
+
+        .familiarity-chip {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.72rem;
+            color: var(--muted);
+        }
+
+        .familiarity-ring {
+            --pct: 0%;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: conic-gradient(var(--primary) var(--pct), var(--surface2) var(--pct));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .familiarity-ring::after {
+            content: '';
+            width: 16px;
+            height: 16px;
+            background: var(--surface);
+            border-radius: 50%;
+        }
+
+        .english-prompt {
+            font-size: 1.9rem;
+            font-weight: 700;
+            line-height: 1.2;
+            color: var(--text);
+            min-height: 2.5em;
+            display: flex;
+            align-items: center;
+        }
+
+        .hindi-answer {
+            margin-top: 14px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--correct);
+            letter-spacing: 0.02em;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            min-height: 1.8em;
+        }
+
+        .hindi-answer.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ── Response / feedback area ───────────────────────────────────────── */
+        .response-area {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px;
+            min-height: 60px;
+        }
+
+        .user-response {
+            font-size: 0.9rem;
+            color: var(--muted);
+            font-style: italic;
+            min-height: 1.4em;
+        }
+
+        .feedback {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-top: 6px;
+            min-height: 1.4em;
+        }
+
+        .feedback.correct {
+            color: var(--correct);
+        }
+
+        .feedback.close {
+            color: var(--close);
+        }
+
+        .feedback.incorrect {
+            color: var(--incorrect);
+        }
+
+        /* ── Text input fallback ────────────────────────────────────────────── */
+        .text-input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .text-input-row.hidden {
+            display: none;
+        }
+
+        .text-input {
+            flex: 1;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 1rem;
+            color: var(--text);
+            outline: none;
+        }
+
+        .text-input:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-icon {
+            background: var(--primary);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 1.1rem;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .btn-icon:hover {
+            background: var(--primary-d);
+        }
+
+        /* ── Bottom action strip ─────────────────────────────────────────────── */
+        .action-strip {
+            padding: var(--gap);
+            padding-bottom: calc(var(--gap) + env(safe-area-inset-bottom, 0px));
+            background: var(--bg);
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap);
+        }
+
+        /* Mic button */
+        .mic-btn {
+            width: 100%;
+            background: var(--primary);
+            border: none;
+            border-radius: 14px;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .mic-btn:active:not(:disabled) {
+            transform: scale(0.97);
+        }
+
+        .mic-btn:disabled {
+            background: var(--surface2);
+            color: var(--muted);
+            cursor: not-allowed;
+        }
+
+        .mic-btn.recording {
+            background: var(--incorrect);
+            animation: pulse 1.2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.75;
+            }
+        }
+
+        .mic-icon {
+            font-size: 1.4rem;
+        }
+
+        /* Secondary action row */
+        .secondary-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--surface);
+            color: var(--text);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s;
+            text-align: center;
+        }
+
+        .btn:hover {
+            background: var(--surface2);
+        }
+
+        .btn.hidden {
+            display: none;
+        }
+
+        /* Rating buttons */
+        .result-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+
+        .result-buttons.hidden {
+            display: none;
+        }
+
+        .rating-btn {
+            padding: 10px 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .rating-btn .emoji {
+            font-size: 1.1rem;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .rating-btn:hover {
+            background: var(--surface2);
+        }
+
+        .rating-btn[data-result="fail"] {
+            border-color: var(--incorrect);
+        }
+
+        .rating-btn[data-result="hard"] {
+            border-color: var(--close);
+        }
+
+        .rating-btn[data-result="good"] {
+            border-color: var(--primary);
+        }
+
+        .rating-btn[data-result="easy"] {
+            border-color: var(--correct);
+        }
+
+        .rating-btn.suggested {
+            background: color-mix(in srgb, var(--primary) 20%, transparent);
+            border-color: var(--primary);
+        }
+
+        .rating-btn[data-result="fail"].suggested {
+            background: color-mix(in srgb, var(--incorrect) 20%, transparent);
+            border-color: var(--incorrect);
+        }
+
+        .rating-btn[data-result="easy"].suggested {
+            background: color-mix(in srgb, var(--correct) 20%, transparent);
+            border-color: var(--correct);
+        }
+
+        .rating-btn[data-result="hard"].suggested {
+            background: color-mix(in srgb, var(--close) 20%, transparent);
+            border-color: var(--close);
+        }
+
+        /* ── Misc helpers ───────────────────────────────────────────────────── */
+        .hidden {
+            display: none !important;
+        }
+
+        /* ── Desktop centering so it looks phone-like on large screens ──────── */
+        @media (min-width: 520px) {
+            body {
+                justify-content: center;
+                align-items: center;
+                background: #07070d;
+            }
+
+            body>* {
+                max-width: 420px;
+                width: 100%;
+            }
+
+            /* Make the whole app look like a phone card */
+            .status-msg,
+            .stats-bar,
+            .progress-wrap,
+            .main,
+            .action-strip {
+                max-width: 420px;
+                width: 100%;
+            }
+
+            /* Wrap in a visible card on desktop */
+            body::before {
+                content: '';
+                position: fixed;
+                inset: 0;
+                background: #07070d;
+                z-index: -1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Status / error banner -->
+    <div id="status-msg" class="status-msg" role="status" aria-live="polite"></div>
+
+    <!-- Stats bar -->
+    <div class="stats-bar" aria-label="Session statistics">
+        <div class="stat">
+            <span class="stat-value" id="stat-due">—</span>
+            <span class="stat-label">Due</span>
+        </div>
+        <div class="stat">
+            <span class="stat-value" id="stat-learned">—</span>
+            <span class="stat-label">Learned</span>
+        </div>
+        <div class="stat">
+            <span class="stat-value" id="stat-total">—</span>
+            <span class="stat-label">Total</span>
+        </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="progress-wrap" aria-label="Overall familiarity progress">
+        <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-label" id="progress-label">0% overall</div>
+    </div>
+
+    <!-- Scrollable content -->
+    <main class="main">
+
+        <!-- Phrase card -->
+        <div class="phrase-card" role="region" aria-label="Current phrase">
+            <div class="card-header">
+                <span class="topic-badge" id="topic-badge">—</span>
+                <div class="familiarity-chip">
+                    <div class="familiarity-ring" title="Familiarity"></div>
+                    <span class="familiarity-pct">0%</span>
+                </div>
+            </div>
+
+            <!-- English prompt -->
+            <div class="english-prompt" id="english-prompt" aria-live="polite">
+                Loading…
+            </div>
+
+            <!-- Correct Hindi answer (revealed after attempt) -->
+            <div class="hindi-answer" id="hindi-answer" aria-live="polite"></div>
+        </div>
+
+        <!-- Response & feedback area -->
+        <div class="response-area" role="region" aria-label="Your response and feedback">
+            <div class="user-response" id="user-response" aria-live="polite"></div>
+            <div class="feedback" id="feedback" aria-live="assertive"></div>
+        </div>
+
+        <!-- Text input — always available as a secondary/fallback input method -->
+        <div class="text-input-row" id="text-input-row">
+            <input type="text" class="text-input" id="text-input" placeholder="Type Hindi (transliteration)…"
+                autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+            <button class="btn-icon" id="submit-text-btn" aria-label="Submit answer">→</button>
+        </div>
+
+    </main>
+
+    <!-- Fixed bottom action strip -->
+    <div class="action-strip">
+
+        <!-- Rating buttons (shown after an attempt) -->
+        <div class="result-buttons hidden" id="result-buttons" role="group" aria-label="Self-assessment">
+            <button class="rating-btn" data-result="fail">
+                <span class="emoji">😟</span>Fail
+            </button>
+            <button class="rating-btn" data-result="hard">
+                <span class="emoji">😓</span>Hard
+            </button>
+            <button class="rating-btn" data-result="good">
+                <span class="emoji">🙂</span>Good
+            </button>
+            <button class="rating-btn" data-result="easy">
+                <span class="emoji">😄</span>Easy
+            </button>
+        </div>
+
+        <!-- Primary mic button -->
+        <button class="mic-btn" id="mic-btn" aria-label="Tap to speak Hindi">
+            <span class="mic-icon">🎤</span>
+            <span class="mic-label">Speak</span>
+        </button>
+
+        <!-- Secondary row: play / show answer / next -->
+        <div class="secondary-row">
+            <button class="btn" id="play-btn" aria-label="Play pronunciation">🔊 Play</button>
+            <button class="btn" id="show-answer-btn" aria-label="Reveal answer">👁 Show</button>
+            <button class="btn hidden" id="next-btn" aria-label="Next phrase">Next →</button>
+        </div>
+
+    </div>
+
+    <!-- Script load order matters: phrases → scoring → srs → db → app -->
+    <script src="./js/phrases.js"></script>
+    <script src="./js/scoring.js"></script>
+    <script src="./js/srs.js"></script>
+    <script src="./js/db.js"></script>
+    <script src="./js/app.js"></script>
+</body>
+
+</html>
