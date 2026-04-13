@@ -71,23 +71,26 @@ function savePhrase(phrase) {
  * Bulk-insert SEED_PHRASES the very first time.
  * Skips gracefully if the store already has data.
  */
+const INITIAL_ACTIVE_COUNT = 5; // only this many phrases active on first run
+
 async function seedPhrases() {
     const existing = await getAllPhrases();
     if (existing.length > 0) return;
 
     const now = Date.now();
+    const DORMANT = 8640000000000000; // far-future timestamp — dormant until activated
 
     return new Promise((resolve, reject) => {
         const tx = _db.transaction('phrases', 'readwrite');
         const store = tx.objectStore('phrases');
 
-        for (const phrase of SEED_PHRASES) {
+        SEED_PHRASES.forEach((phrase, i) => {
             store.put({
                 ...phrase,
                 ...SRS_DEFAULTS,
-                next_review: now,   // everything due immediately on first run
+                next_review: i < INITIAL_ACTIVE_COUNT ? now : DORMANT,
             });
-        }
+        });
 
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);

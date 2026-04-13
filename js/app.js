@@ -41,14 +41,22 @@ async function init() {
 
 // ── Queue management ──────────────────────────────────────────────────────────
 
+const MAX_SESSION_SIZE = 8; // never more than this many in one round
+
 function buildQueue() {
     phraseQueue = selectPhrases(allPhrases);
 
-    // Fallback: if nothing is due/priority, take the 10 least familiar
+    // Cap to a focused working set
+    if (phraseQueue.length > MAX_SESSION_SIZE) {
+        phraseQueue = phraseQueue.slice(0, MAX_SESSION_SIZE);
+    }
+
+    // Fallback: if nothing is due, take the few least-familiar active phrases
     if (phraseQueue.length === 0) {
-        phraseQueue = [...allPhrases]
+        const active = allPhrases.filter(p => p.next_review < 8640000000000000);
+        phraseQueue = [...active]
             .sort((a, b) => a.familiarity - b.familiarity)
-            .slice(0, 10);
+            .slice(0, MAX_SESSION_SIZE);
     }
 }
 
@@ -274,8 +282,14 @@ async function submitResult(resultCode) {
 
     // Introduce new phrases if the active set is strong enough
     if (shouldIntroduceNew(allPhrases)) {
-        // New phrases are already seeded; selectPhrases will pick them up
-        // when their next_review is due (i.e. immediately — next_review = 0).
+        const newBatch = introduceNewPhrases(allPhrases);
+        for (const p of newBatch) {
+            try { await savePhrase(p); } catch (_) { /* best-effort */ }
+        }
+        if (newBatch.length > 0) {
+            showStatus(`✨ ${newBatch.length} new phrase${newBatch.length > 1 ? 's' : ''} unlocked!`, 'info');
+            setTimeout(hideStatus, 3000);
+        }
     }
 
     updateStats();
@@ -305,22 +319,23 @@ function speakHindi(text) {
 
 function updateStats() {
     const now = Date.now();
-    const total = allPhrases.length;
-    const learned = allPhrases.filter(p => p.familiarity >= 0.7).length;
-    const due = allPhrases.filter(p => p.next_review <= now).length;
+    const active = allPhrases.filter(p => p.next_review < 8640000000000000);
+    const learned = active.filter(p => p.familiarity >= 0.7).length;
+    const due = active.filter(p => p.next_review <= now).length;
 
-    $statTotal.textContent = total;
+    $statTotal.textContent = active.length;
     $statLearned.textContent = learned;
     $statDue.textContent = due;
 }
 
 function updateProgressBar() {
-    const avg = allPhrases.length
-        ? allPhrases.reduce((s, p) => s + p.familiarity, 0) / allPhrases.length
+    const active = allPhrases.filter(p => p.next_review < 8640000000000000);
+    const avg = active.length
+        ? active.reduce((s, p) => s + p.familiarity, 0) / active.length
         : 0;
     const pct = Math.round(avg * 100);
     $progressFill.style.width = pct + '%';
-    $progressLabel.textContent = `${pct}% overall`;
+    $progressLabel.textContent = `${pct}% · ${active.length} of ${allPhrases.length} phrases active`;
 }
 
 function showStatus(msg, type = 'info') {
@@ -349,6 +364,18 @@ function showAllCaughtUp() {
     $micBtn.disabled = true;
     $showAnswerBtn.classList.add('hidden');
     updateProgressBar();
+}
+
+async function resetProgress() {
+    if (!confirm('Reset all progress? This will start you over with 5 phrases.')) return;
+    _db.close();
+    _db = null;
+    await new Promise((resolve, reject) => {
+        const req = indexedDB.deleteDatabase(DB_NAME);
+        req.onsuccess = resolve;
+        req.onerror = reject;
+    });
+    location.reload();
 }
 
 // ── Event wiring ──────────────────────────────────────────────────────────────
@@ -408,6 +435,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitText = document.getElementById('submit-text-btn');
     if (textInput) textInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleTextSubmit(); });
     if (submitText) submitText.addEventListener('click', handleTextSubmit);
+
+    // Reset progress
+    const resetBtn = document.getElementById('reset-btn');
+    if (resetBtn) resetBtn.addEventListener('click', resetProgress);
 
     // Kick off
     init();

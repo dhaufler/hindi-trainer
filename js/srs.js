@@ -86,22 +86,40 @@ function selectPhrases(phrases, now = Date.now()) {
     return merged;
 }
 
+const DORMANT_TS = 8640000000000000; // must match db.js
+const NEW_BATCH_SIZE = 3;            // how many new phrases per introduction
+
 /**
  * Returns true when the active set is strong enough to introduce new phrases.
+ * "Active" = any phrase whose next_review is not the far-future dormant value.
  *
- * Condition: average familiarity of non-zero-familiarity phrases > 0.6,
- * OR there are no active phrases at all.
- *
- * @param {Array} phrases - all phrases (any familiarity)
+ * Condition: average familiarity of active phrases >= 0.5
  */
 function shouldIntroduceNew(phrases) {
-    if (phrases.length === 0) return true;
+    const active = phrases.filter(p => p.next_review < DORMANT_TS);
+    if (active.length === 0) return true;
 
-    const active = phrases.filter(p => p.familiarity > 0 || p.error_count > 0);
-    if (active.length === 0) return false;
+    // Need at least one review before we consider introducing
+    const reviewed = active.filter(p => p.familiarity > 0 || p.error_count > 0);
+    if (reviewed.length === 0) return false;
 
-    const avg = active.reduce((s, p) => s + p.familiarity, 0) / active.length;
-    return avg > 0.6;
+    const avg = reviewed.reduce((s, p) => s + p.familiarity, 0) / reviewed.length;
+    return avg >= 0.5;
+}
+
+/**
+ * Activate the next batch of dormant phrases by setting their
+ * next_review to now.  Returns the newly activated phrase objects.
+ */
+function introduceNewPhrases(allPhrases, count = NEW_BATCH_SIZE) {
+    const dormant = allPhrases.filter(p => p.next_review >= DORMANT_TS);
+    const batch = dormant.slice(0, count);
+    const now = Date.now();
+
+    for (const p of batch) {
+        p.next_review = now;
+    }
+    return batch;
 }
 
 /**

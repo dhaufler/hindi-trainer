@@ -513,7 +513,7 @@
         </div>
         <div class="stat">
             <span class="stat-value" id="stat-total">—</span>
-            <span class="stat-label">Total</span>
+            <span class="stat-label">Active</span>
         </div>
     </div>
 
@@ -522,7 +522,7 @@
         <div class="progress-track">
             <div class="progress-fill" id="progress-fill"></div>
         </div>
-        <div class="progress-label" id="progress-label">0% overall</div>
+        <div class="progress-label" id="progress-label">0% · loading…</div>
     </div>
 
     <!-- Scrollable content -->
@@ -593,6 +593,10 @@
             <button class="btn" id="show-answer-btn" aria-label="Reveal answer">👁 Show</button>
             <button class="btn hidden" id="next-btn" aria-label="Next phrase">Next →</button>
         </div>
+
+        <button class="btn" id="reset-btn"
+            style="font-size:0.7rem;color:var(--muted);border:none;background:none;padding:6px;margin-top:2px;align-self:center"
+            aria-label="Reset progress">↺ Reset progress</button>
 
     </div>
 

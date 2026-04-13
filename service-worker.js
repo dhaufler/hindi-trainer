@@ -1,7 +1,7 @@
 // ── service-worker.js ─────────────────────────────────────────────────────────
 // Caches all app assets on install; serves from cache first when offline.
 
-const CACHE_NAME = 'hindi-trainer-v1';
+const CACHE_NAME = 'hindi-trainer-v2';
 
 const PRECACHE_URLS = [
     './',
@@ -39,28 +39,30 @@ self.addEventListener('activate', event => {
     );
 });
 
-// ── Fetch: cache-first strategy ───────────────────────────────────────────────
+// ── Fetch: network-first strategy (falls back to cache when offline) ──────────
 self.addEventListener('fetch', event => {
     // Only intercept same-origin GET requests
     if (event.request.method !== 'GET') return;
 
     event.respondWith(
-        caches.match(event.request).then(cached => {
-            if (cached) return cached;
-
-            return fetch(event.request).then(response => {
-                // Cache a copy of new successful responses
+        fetch(event.request)
+            .then(response => {
+                // Update the cache with the fresh response
                 if (response.ok) {
                     const clone = response.clone();
                     caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
                 }
                 return response;
-            }).catch(() => {
-                // Return a minimal offline page if HTML is requested and not cached
-                if (event.request.headers.get('Accept')?.includes('text/html')) {
-                    return caches.match('./index.html');
-                }
-            });
-        })
+            })
+            .catch(() => {
+                // Network failed — serve from cache
+                return caches.match(event.request).then(cached => {
+                    if (cached) return cached;
+                    // Last resort for HTML requests
+                    if (event.request.headers.get('Accept')?.includes('text/html')) {
+                        return caches.match('./index.html');
+                    }
+                });
+            })
     );
 });
