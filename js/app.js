@@ -12,6 +12,7 @@ let currentPhrase = null; // the phrase being drilled right now
 let recognition = null; // SpeechRecognition instance
 let isRecognizing = false;
 let currentScore = null; // score from the last recognition result
+let peeked = false;      // true if user tapped 'Show' before answering
 
 // ── DOM refs (populated on DOMContentLoaded) ──────────────────────────────────
 let $englishPrompt, $hindiAnswer, $userResponse, $feedback,
@@ -74,6 +75,7 @@ function advanceToNext() {
 
     currentPhrase = phraseQueue.shift();
     currentScore = null;
+    peeked = false;
 
     // Resolve template slot if applicable
     const displayEnglish = resolveTemplate(currentPhrase.english);
@@ -224,14 +226,25 @@ function showFeedback(score, result) {
     $hindiAnswer.classList.add('visible');
 
     const pct = Math.round(score * 100);
-    const labels = {
-        correct: `✅ Correct! (${pct}%)`,
-        close: `🟡 Close — (${pct}%)`,
-        incorrect: `❌ Incorrect (${pct}%)`,
-    };
 
-    $feedback.textContent = labels[result];
-    $feedback.className = `feedback ${result}`;
+    if (peeked) {
+        // User saw the answer first — this is practice, always counts as fail
+        const matchLabel = result === 'correct' ? '✅ Good pronunciation!'
+            : result === 'close' ? '🟡 Close — keep practicing'
+                : '❌ Try again';
+        $feedback.textContent = `${matchLabel} (${pct}%) — peeked, counts as fail`;
+        $feedback.className = 'feedback close';
+        highlightSuggestedRating('fail');
+    } else {
+        const labels = {
+            correct: `✅ Correct! (${pct}%)`,
+            close: `🟡 Close — (${pct}%)`,
+            incorrect: `❌ Incorrect (${pct}%)`,
+        };
+        $feedback.textContent = labels[result];
+        $feedback.className = `feedback ${result}`;
+        highlightSuggestedRating(scoreToResult(score));
+    }
 
     // Speak the answer aloud
     speakHindi(currentPhrase._resolvedHindi);
@@ -247,9 +260,6 @@ function showFeedback(score, result) {
     if (ti && !document.getElementById('text-input-row').classList.contains('hidden')) {
         ti.value = '';
     }
-
-    // Pre-select the most likely self-assessment based on score
-    highlightSuggestedRating(scoreToResult(score));
 }
 
 function highlightSuggestedRating(suggested) {
@@ -407,21 +417,32 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentPhrase) speakHindi(currentPhrase._resolvedHindi);
     });
 
-    // Show answer manually (without speaking)
+    // Show answer — reveal it but keep mic/text active for practice
     $showAnswerBtn.addEventListener('click', () => {
         if (!currentPhrase) return;
+        peeked = true;
         $hindiAnswer.textContent = currentPhrase._resolvedHindi;
         $hindiAnswer.classList.add('visible');
-        $resultButtons.classList.remove('hidden');
-        $nextBtn.classList.remove('hidden');
         $showAnswerBtn.classList.add('hidden');
-        $micBtn.disabled = true;
+        $nextBtn.classList.remove('hidden');
+        $resultButtons.classList.remove('hidden');
+        // Keep mic active so user can practice speaking it
+        // (but it will count as 'fail' for SRS)
+        if ($micBtn.querySelector('.mic-label').textContent !== 'Mic blocked') {
+            $micBtn.disabled = false;
+            $micBtn.querySelector('.mic-label').textContent = 'Practice';
+        }
+        $feedback.textContent = '👆 Try saying it — counts as practice (fail for SRS)';
+        $feedback.className = 'feedback close';
+        highlightSuggestedRating('fail');
         speakHindi(currentPhrase._resolvedHindi);
     });
 
-    // "Next" quick-advance (counts as 'good' if a score was already recorded)
+    // "Next" quick-advance — fail if peeked, otherwise auto-grade
     $nextBtn.addEventListener('click', () => {
-        const code = currentScore !== null ? scoreToResult(currentScore) : 'good';
+        const code = peeked ? 'fail'
+            : currentScore !== null ? scoreToResult(currentScore)
+                : 'good';
         submitResult(code);
     });
 
