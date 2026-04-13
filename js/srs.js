@@ -25,20 +25,20 @@ function updateSRS(phrase, result) {
     switch (result) {
         case 'fail':
             familiarity -= 0.20;
-            interval_days = 0.5;
+            interval_days = 0.003;   // ~4 minutes — come back very soon
             error_count += 1;
             break;
         case 'hard':
             familiarity += 0.05;
-            interval_days *= 1.2;
+            interval_days = Math.max(0.005, interval_days * 1.2); // ~7 min minimum
             break;
         case 'good':
             familiarity += 0.10;
-            interval_days *= 2.0;
+            interval_days = Math.max(0.007, interval_days * 1.5); // ~10 min minimum
             break;
         case 'easy':
             familiarity += 0.15;
-            interval_days *= 2.5;
+            interval_days = Math.max(0.01, interval_days * 2.0);  // ~15 min minimum
             break;
         default:
             console.warn('updateSRS: unknown result', result);
@@ -47,8 +47,11 @@ function updateSRS(phrase, result) {
     // Clamp familiarity to [0, 1]
     familiarity = Math.min(1, Math.max(0, familiarity));
 
-    // Enforce a sensible minimum interval so we don't get stuck
-    interval_days = Math.max(0.25, interval_days);
+    // Once well-learned (familiarity >= 0.7), allow longer real-day intervals.
+    // Below that, keep intervals short so phrases recycle within the session.
+    if (familiarity < 0.7) {
+        interval_days = Math.min(interval_days, 0.04); // cap at ~1 hour
+    }
 
     const next_review = Date.now() + interval_days * 24 * 60 * 60 * 1000;
 
@@ -93,18 +96,19 @@ const NEW_BATCH_SIZE = 3;            // how many new phrases per introduction
  * Returns true when the active set is strong enough to introduce new phrases.
  * "Active" = any phrase whose next_review is not the far-future dormant value.
  *
- * Condition: average familiarity of active phrases >= 0.5
+ * Condition: EVERY active phrase must have familiarity >= 0.7
+ * (i.e. you've truly learned the whole batch before moving on).
  */
 function shouldIntroduceNew(phrases) {
     const active = phrases.filter(p => p.next_review < DORMANT_TS);
     if (active.length === 0) return true;
 
-    // Need at least one review before we consider introducing
-    const reviewed = active.filter(p => p.familiarity > 0 || p.error_count > 0);
-    if (reviewed.length === 0) return false;
+    // Need at least one review on every active phrase before considering
+    const allReviewed = active.every(p => p.familiarity > 0 || p.error_count > 0);
+    if (!allReviewed) return false;
 
-    const avg = reviewed.reduce((s, p) => s + p.familiarity, 0) / reviewed.length;
-    return avg >= 0.5;
+    // Every active phrase must be at 0.7+ familiarity
+    return active.every(p => p.familiarity >= 0.7);
 }
 
 /**

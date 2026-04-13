@@ -47,17 +47,19 @@ const MAX_SESSION_SIZE = 8; // never more than this many in one round
 function buildQueue() {
     phraseQueue = selectPhrases(allPhrases);
 
+    // If nothing is strictly due yet, pull in the active phrases that
+    // haven't been mastered — they should keep cycling in-session.
+    if (phraseQueue.length === 0) {
+        const active = allPhrases.filter(p => p.next_review < 8640000000000000);
+        const unmastered = active.filter(p => p.familiarity < 0.7);
+        phraseQueue = [...(unmastered.length ? unmastered : active)]
+            .sort((a, b) => a.familiarity - b.familiarity)
+            .slice(0, MAX_SESSION_SIZE);
+    }
+
     // Cap to a focused working set
     if (phraseQueue.length > MAX_SESSION_SIZE) {
         phraseQueue = phraseQueue.slice(0, MAX_SESSION_SIZE);
-    }
-
-    // Fallback: if nothing is due, take the few least-familiar active phrases
-    if (phraseQueue.length === 0) {
-        const active = allPhrases.filter(p => p.next_review < 8640000000000000);
-        phraseQueue = [...active]
-            .sort((a, b) => a.familiarity - b.familiarity)
-            .slice(0, MAX_SESSION_SIZE);
     }
 }
 
